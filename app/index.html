@@ -22,7 +22,7 @@
     </svg>
     <div class="brand-text">
       <h1>Leonida Legend</h1>
-      <p class="tagline">Grand Theft Auto VI — Trophy Guide &amp; Tracker · PlayStation 5 · All 55 official trophies, each with steps, tips and a citation for every claim</p>
+      <p class="tagline">GTA VI · PS5 · 55 trophies · every step cited</p>
     </div>
   </div>
   <div class="progress-block">
@@ -38,6 +38,8 @@
   </div>
 </header>
 
+<section class="audit-strip" id="audit-strip" aria-label="Guide audit — counted from the guide's own data"></section>
+
 <nav class="views" aria-label="Guide views">
   <button class="view-tab active" data-view="guide" type="button">Guide &amp; Tracker</button>
   <button class="view-tab" data-view="roadmap" type="button">Roadmap to the Platinum</button>
@@ -51,27 +53,28 @@
     <div class="layout">
       <div id="trophy-list" class="trophy-list"></div>
       <aside id="detail" class="detail" aria-live="polite"></aside>
+      <aside id="rail" class="rail" aria-label="Next up and sources for this guide"></aside>
     </div>
   </section>
 
   <section id="view-roadmap" hidden>
-    <p class="view-intro">The road to <strong>Vice Got a Price!</strong>, rebuilt on the game's real structure: the five chapters with their missions in order (chapter trophies pop late — at the start of the <em>next</em> chapter), the save discipline that replaces mission replay, then the 100% checklist with its partial targets, and clean-up. Progress is tracked live on every card.</p>
+    <p class="view-line">The road to <strong>Vice Got a Price!</strong> on the game's real structure — five chapters, missions in order, late-popping chapter trophies, a 15-slot save discipline, then the 100% checklist's partial targets.</p>
     <div id="roadmap" class="roadmap"></div>
   </section>
 
   <section id="view-missables" hidden>
-    <p class="view-intro">What can actually be lost in Leonida — checked against five sources, not guessed from trophy descriptions. The honest headline: <strong>at most one trophy is at risk, and even that is unconfirmed</strong>. Everything else on this page is content, cash and cars that the chapter gates take away, plus the one disputed race the guides argue about.</p>
+    <p class="view-line">What can actually be lost in Leonida, checked against the sources — at most one trophy is at risk, and even that is unconfirmed; the rest is content, cash and cars behind chapter gates.</p>
     <div id="missable-list" class="missable-list"></div>
   </section>
 
   <section id="view-sources" hidden>
-    <p class="view-intro">Every bracketed number in this guide's steps points at one entry in this registry. Only pages that were <strong>actually opened and read</strong> on the date shown are listed — including the ones that turned out to be unfinished, partly read, or impossible to find. Pages we could not open are never cited.</p>
+    <p class="view-line">Every bracketed number in the steps points at one entry in this registry — only pages actually opened and read on the date shown, including the unfinished and the unfindable.</p>
     <div id="sources-list" class="sources-list"></div>
   </section>
 </main>
 
 <footer class="colophon">
-  <p>Guides written for this page in our own words, and researched properly: every step in every guide carries the number of the source that backs it, and the Sources view lists that registry in full — what was read, when, and how completely. Where our sources disagree, the guide shows the disagreement instead of hiding it. Trophy names, descriptions and grades are the official PlayStation list (registry entry [1]). Progress is stored only in your browser (localStorage); export it before switching devices. This app loads nothing from the network beyond its own files.</p>
+  <p>Guides in our own words; every step cites its source. Trophy names, descriptions and grades are the official PlayStation list [1]. Progress lives only in your browser (localStorage). This app loads nothing beyond its own files.</p>
 </footer>
 
 <script src="js/tracker.js"></script>

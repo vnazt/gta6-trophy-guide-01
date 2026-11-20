@@ -1,9 +1,11 @@
-// Leonida Legend — guide view (v2).
-// Renders the checklist with its filters and search, the per-trophy guide
-// with numbered steps whose every claim carries a citation chip into the
-// source registry (data/sources.json), the chapter-by-chapter roadmap, the
-// at-risk & points-of-no-return view, and the registry itself. Data is the
-// official list in data/trophies.json plus the registry in
+// Leonida Legend — guide view (v3 presentation).
+// A paper-ledger layout: a live audit strip counted from the data itself,
+// a compact three-column tracker (checklist | guide | sources rail), and
+// a detail that leads with numbered steps whose every claim carries a
+// named citation chip into the source registry (data/sources.json).
+// The other views are artefacts, not prose: roadmap stage cards, the
+// at-risk cards, and the registry with its trophy × source matrix.
+// Data is the official list in data/trophies.json plus the registry in
 // data/sources.json — two relative fetches, nothing else from the network.
 
 (function () {
@@ -15,6 +17,8 @@
     misc: 'Free roam',
   };
   const GRADE_ORDER = ['platinum', 'gold', 'silver', 'bronze'];
+  const GRADE_LETTER = { platinum: 'P', gold: 'G', silver: 'S', bronze: 'B' };
+  const GRADE_RANK = { platinum: 0, gold: 1, silver: 2, bronze: 3 };
   const FILTERS = [
     ['all', 'All'],
     ['story', 'Story'],
@@ -25,6 +29,32 @@
     ['earned', 'Earned'],
     ['remaining', 'Remaining'],
   ];
+  // The name a citation chip carries: short enough to read at thumbnail
+  // size, with the full title one click away in the registry.
+  const CHIP_NAMES = {
+    1: 'Official list',
+    2: 'PowerPyx',
+    3: 'PowerPyx',
+    4: 'PowerPyx',
+    5: 'PowerPyx',
+    6: 'PowerPyx',
+    7: 'PowerPyx',
+    12: 'OutputLag',
+    13: 'KeenGamer',
+    14: 'HappyGamer',
+    15: 'Games Wiki',
+  };
+  // The detail's at-risk note is one line; the full explanation lives in
+  // the At-risk view. Only one trophy in the game needs it.
+  const RISK_LINE =
+    'the Chapter 1 balcony meditation at Jason’s house ends when Chapter 1 does — and whether this trophy needs its +1 is unconfirmed.';
+  const RISK_CITES = [2, 5];
+  // Where a dispute panel needs our position stated, in our own words.
+  const DISPUTE_CALLS = {
+    7: 'Our call: plan for the walkthrough’s structure — ten Chapter 5 missions after Starting From Zero. The trophy is unmissable either way; only the running order is in doubt.',
+    25: 'Our call: run the race the moment it appears. It costs minutes, first place pays $3,800, and it is the only reading under which anything can be lost.',
+    50: 'Our call: follow the documented PowerPyx encounter first — it is the only complete method anyone has published. Treat the rival leads as unproven until a trigger is confirmed.',
+  };
 
   /* ---------- roadmap data: the real structure of the game ---------- */
 
@@ -182,7 +212,9 @@
 
   const listEl = document.getElementById('trophy-list');
   const detailEl = document.getElementById('detail');
+  const railEl = document.getElementById('rail');
   const chipsEl = document.getElementById('filter-chips');
+  const auditEl = document.getElementById('audit-strip');
   const roadmapEl = document.getElementById('roadmap');
   const missableEl = document.getElementById('missable-list');
   const sourcesEl = document.getElementById('sources-list');
@@ -256,7 +288,13 @@
     ).length;
   }
 
-  /* ---------- citations ---------- */
+  /* ---------- citations & the audit ---------- */
+
+  function chipName(n) {
+    if (CHIP_NAMES[n]) return CHIP_NAMES[n];
+    const src = registry.get(n);
+    return src ? src.short : `Source ${n}`;
+  }
 
   function citeHtml(ids) {
     if (!ids || ids.length === 0) return '';
@@ -264,7 +302,7 @@
       .map((n) => {
         const src = registry.get(n);
         const label = src ? `${src.short} — ${src.title}` : `Source ${n}`;
-        return `<button type="button" class="cite" data-source="${n}" title="${esc(label)}">[${n}]</button>`;
+        return `<button type="button" class="cite" data-source="${n}" title="${esc(label)}">[${n} · ${esc(chipName(n))}]</button>`;
       })
       .join('')}</span>`;
   }
@@ -274,6 +312,71 @@
     (trophy.steps || []).forEach((s) => (s.s || []).forEach((n) => set.add(n)));
     (trophy.disputes || []).forEach((d) => (d.s || []).forEach((n) => set.add(n)));
     return [...set].sort((a, b) => a - b);
+  }
+
+  // Every claim in one trophy that cites source n (steps + dispute panels).
+  function claimsHere(trophy, n) {
+    let total = 0;
+    (trophy.steps || []).forEach((s) => (s.s || []).forEach((id) => { if (id === n) total += 1; }));
+    (trophy.disputes || []).forEach((d) => (d.s || []).forEach((id) => { if (id === n) total += 1; }));
+    return total;
+  }
+
+  // Per-source totals across the whole guide: claims and guide coverage.
+  function sourceStats() {
+    const stats = new Map();
+    for (const src of registry.values()) stats.set(src.n, { claims: 0, guides: new Set() });
+    for (const t of trophies) {
+      for (const n of citedIds(t)) {
+        const row = stats.get(n);
+        if (!row) continue;
+        row.claims += claimsHere(t, n);
+        row.guides.add(t.id);
+      }
+    }
+    return stats;
+  }
+
+  // The audit strip is counted from the loaded data, never typed by hand.
+  function computeAudit() {
+    const audit = { trophies: trophies.length, steps: 0, citations: 0, multi: 0, guides: 0, sources: registry.size, disputes: 0, atrisk: 0 };
+    for (const t of trophies) {
+      let cited = 0;
+      for (const s of t.steps || []) {
+        audit.steps += 1;
+        audit.citations += (s.s || []).length;
+        cited += (s.s || []).length;
+        if ((s.s || []).length >= 2) audit.multi += 1;
+      }
+      for (const d of t.disputes || []) {
+        audit.disputes += 1;
+        audit.citations += (d.s || []).length;
+        cited += (d.s || []).length;
+      }
+      if (cited > 0) audit.guides += 1;
+      if (t.missable) audit.atrisk += 1;
+    }
+    return audit;
+  }
+
+  function renderAudit() {
+    const a = computeAudit();
+    const tiles = [
+      ['trophies', a.trophies, 'Trophies', ''],
+      ['steps', a.steps, 'Steps', ''],
+      ['citations', a.citations, 'Citations', ''],
+      ['multi', a.multi, 'Steps with 2+ sources', ''],
+      ['guides', `${a.guides}/${a.trophies}`, 'Guides cite sources', ''],
+      ['sources', a.sources, 'Sources in registry', ''],
+      ['disputes', a.disputes, 'Disputes, both ways', ''],
+      ['atrisk', a.atrisk, 'At risk', ' risk'],
+    ];
+    auditEl.innerHTML = tiles
+      .map(
+        ([key, value, label, cls]) =>
+          `<div class="audit-tile${cls}"><span class="audit-num" data-audit="${key}">${value}</span><span class="audit-label">${label}</span></div>`,
+      )
+      .join('');
   }
 
   function wireCites(root) {
@@ -301,8 +404,7 @@
     document.getElementById('grade-counts').innerHTML = GRADE_ORDER.map((grade) => {
       const inGrade = trophies.filter((t) => t.grade === grade);
       const done = inGrade.filter((t) => LeonidaTracker.isEarned(t.name)).length;
-      const label = grade[0].toUpperCase() + grade.slice(1);
-      return `<span class="grade-count" style="color: var(--${grade})">${label} ${done}/${inGrade.length}</span>`;
+      return `<span class="grade-count"><span class="dot" style="background: var(--${grade === 'platinum' ? 'plat' : grade})"></span>${GRADE_LETTER[grade]} ${done}/${inGrade.length}</span>`;
     }).join('');
     const toggle = document.getElementById('spoiler-toggle');
     toggle.textContent = `Spoiler shield: ${LeonidaTracker.getSpoiler() ? 'ON' : 'OFF'}`;
@@ -328,9 +430,17 @@
     const value = LeonidaTracker.getCount(trophy.name);
     const shown =
       trophy.count >= 10000
-        ? `$${value.toLocaleString('en-US')} / $${trophy.count.toLocaleString('en-US')}`
-        : `${value} / ${trophy.count}${trophy.unit ? ` ${esc(trophy.unit)}` : ''}`;
+        ? `$${Math.round(value / 1000)}k / $${Math.round(trophy.count / 1000)}k`
+        : `${value}/${trophy.count}`;
     return `<span class="row-count">${shown}</span>`;
+  }
+
+  function rowFlags(trophy) {
+    return (
+      (trophy.missable ? '<span class="flag risk">At risk</span>' : '') +
+      (trophy.unconfirmed ? '<span class="flag unconf">Unconfirmed</span>' : '') +
+      (trophy.disputes && trophy.disputes.length ? '<span class="flag dispute">⇄ Dispute</span>' : '')
+    );
   }
 
   function renderList() {
@@ -347,19 +457,21 @@
     listEl.innerHTML = visible
       .map((t) => {
         const earned = LeonidaTracker.isEarned(t.name);
+        const meta = [
+          KIND_LABELS[t.kind],
+          t.chapterLabel ? esc(t.chapterLabel) : '',
+          counterText(t),
+          `${citedIds(t).length} src`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
         return `<button type="button" class="trophy-row${earned ? ' earned' : ''}${t.id === selectedId ? ' selected' : ''}" data-id="${t.id}">
           <input type="checkbox" data-earn="${t.id}" ${earned ? 'checked' : ''} aria-label="Mark ${esc(displayName(t))} as earned">
+          <span class="grade-dot ${t.grade}">${GRADE_LETTER[t.grade]}</span>
           <span class="row-main">
             <span class="row-name">${esc(displayName(t))}</span>
-            <span class="row-desc" style="display:block">${esc(displayDesc(t))}</span>
-            <span class="row-meta">
-              <span class="grade-badge ${t.grade}">${t.grade}</span>
-              <span class="kind-tag">${KIND_LABELS[t.kind]}</span>
-              ${t.chapterLabel ? `<span class="stage-tag">${esc(t.chapterLabel)}</span>` : ''}
-              ${t.missable ? '<span class="missable-badge">AT RISK</span>' : ''}
-              ${t.unconfirmed ? '<span class="unconfirmed-badge">UNCONFIRMED</span>' : ''}
-              ${counterText(t)}
-            </span>
+            <span class="row-desc">${esc(displayDesc(t))}</span>
+            <span class="row-meta">${rowFlags(t)}${meta}</span>
           </span>
         </button>`;
       })
@@ -386,16 +498,16 @@
     if (!trophy.steps || trophy.steps.length === 0) return '';
     const items = trophy.steps
       .map(
-        (s) =>
-          `<li class="step-item"><span class="step-text">${esc(s.t)}</span>${citeHtml(s.s)}</li>`,
+        (s, i) =>
+          `<li class="step-item"><span class="step-num">${i + 1}</span><span class="step-text">${esc(s.t)}${citeHtml(s.s)}${(s.s || []).length === 1 ? '<span class="single-tag">single source</span>' : ''}</span></li>`,
       )
       .join('');
-    return `<h3>Steps</h3><ol class="steps">${items}</ol>`;
+    return `<h3 class="sec-head">How to earn it · ${trophy.steps.length} steps, each with its sources</h3><ol class="steps">${items}</ol>`;
   }
 
   function tipsHtml(trophy) {
     if (!trophy.tips || trophy.tips.length === 0) return '';
-    return `<h3>Time-savers</h3><ul class="tips">${trophy.tips
+    return `<h3 class="sec-head">Time-savers</h3><ul class="tips">${trophy.tips
       .map((tip) => `<li>${esc(tip)}</li>`)
       .join('')}</ul>`;
   }
@@ -405,29 +517,16 @@
     return trophy.disputes
       .map(
         (d) => `<div class="dispute-box">
-          <strong class="dispute-topic">Sources disagree — ${esc(d.topic)}</strong>
-          <p><span class="side-label">One side:</span> ${esc(d.a)}</p>
-          <p><span class="side-label">The other:</span> ${esc(d.b)}</p>
-          <div class="dispute-cites">${citeHtml(d.s)}</div>
+          <strong class="dispute-topic">⇄ Sources differ — ${esc(d.topic)}</strong>
+          <div class="dispute-sides">
+            <p><span class="side-label">One side</span>${esc(d.a)}</p>
+            <p><span class="side-label">The other side</span>${esc(d.b)}</p>
+          </div>
+          ${DISPUTE_CALLS[trophy.id] ? `<p class="our-call">${esc(DISPUTE_CALLS[trophy.id])}</p>` : ''}
+          ${citeHtml(d.s)}
         </div>`,
       )
       .join('');
-  }
-
-  function citedSourcesHtml(trophy) {
-    const ids = citedIds(trophy);
-    if (ids.length === 0) return '';
-    const items = ids
-      .map((n) => {
-        const src = registry.get(n);
-        if (!src) return '';
-        const title = src.url
-          ? `<a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.title)}</a>`
-          : esc(src.title);
-        return `<li><span class="cite-static">[${n}]</span> <strong>${esc(src.short)}</strong> — ${title}</li>`;
-      })
-      .join('');
-    return `<h3>Cited in this guide</h3><ul class="sources cited-list">${items}</ul>`;
   }
 
   function counterHtml(trophy) {
@@ -440,11 +539,11 @@
       trophy.count >= 10000
         ? `$${trophy.count.toLocaleString('en-US')}`
         : `${trophy.count}${trophy.unit ? ` ${esc(trophy.unit)}` : ''}`;
-    return `<h3>Your count</h3><div class="counter-box">
+    return `<h3 class="sec-head">Your count</h3><div class="counter-box">
         <button type="button" class="counter-btn" data-bump="-1" aria-label="Decrease count">−</button>
         <span class="counter-value">${shown}</span>
         <span class="counter-total">/ ${total}</span>
-        <span class="counter-bar"><span class="counter-fill" style="display:block;width:${pct}%"></span></span>
+        <span class="counter-bar"><span class="counter-fill" style="width:${pct}%"></span></span>
         <button type="button" class="counter-btn" data-bump="1" aria-label="Increase count">+</button>
       </div>`;
   }
@@ -457,27 +556,37 @@
     }
     selectedId = trophy.id;
     const earned = LeonidaTracker.isEarned(trophy.name);
+    const gradeLabel = trophy.grade[0].toUpperCase() + trophy.grade.slice(1);
+    const badges = [
+      `<span class="meta-badge grade-${trophy.grade}">${gradeLabel}</span>`,
+      `<span class="meta-badge">${KIND_LABELS[trophy.kind]}</span>`,
+      trophy.chapterLabel ? `<span class="meta-badge">${esc(trophy.chapterLabel)}</span>` : '',
+      trophy.missable ? '<span class="meta-badge risk">At risk</span>' : '',
+      trophy.unconfirmed ? '<span class="meta-badge unconf">Method unconfirmed</span>' : '',
+      trophy.disputes && trophy.disputes.length ? '<span class="meta-badge dispute">⇄ Sources differ</span>' : '',
+    ]
+      .filter(Boolean)
+      .join('');
     detailEl.innerHTML = `<article class="detail-card">
-      <div class="row-meta">
-        <span class="grade-badge ${trophy.grade}">${trophy.grade}</span>
-        <span class="kind-tag">${KIND_LABELS[trophy.kind]}</span>
-        ${trophy.chapterLabel ? `<span class="stage-tag">${esc(trophy.chapterLabel)}</span>` : ''}
-        ${trophy.missable ? '<span class="missable-badge">AT RISK — UNCONFIRMED</span>' : ''}
-        ${trophy.unconfirmed ? '<span class="unconfirmed-badge">UNCONFIRMED</span>' : ''}
+      <div class="detail-top">
+        <span class="grade-dot big ${trophy.grade}">${GRADE_LETTER[trophy.grade]}</span>
+        <h2>${esc(displayName(trophy))}</h2>
+        <button type="button" class="earn-btn${earned ? ' earned' : ''}" id="detail-earn">${earned ? '✓ Earned — tap to undo' : 'Mark as earned'}</button>
       </div>
-      <h2>${esc(displayName(trophy))}</h2>
-      <p class="official-desc">“${esc(displayDesc(trophy))}” — official description</p>
+      <div class="quote-box">
+        <span class="quote-text">“${esc(displayDesc(trophy))}”</span>
+        <div class="quote-meta">${gradeLabel} · #${trophy.id} of ${trophies.length} · ${KIND_LABELS[trophy.kind]} · official description ${citeHtml([1])}</div>
+      </div>
       ${trophy.mission ? `<p class="mission-line"><strong>${esc(trophy.mission)}</strong>${trophy.popsNote ? ` · ${esc(trophy.popsNote)}` : ''}</p>` : ''}
-      ${trophy.missable ? `<div class="missable-banner"><strong>At risk — read before you play on</strong>${esc(trophy.missableNote)}</div>` : ''}
-      <h3>The guide — in our words</h3>
-      <p class="guide-text">${esc(trophy.guide)}</p>
+      <div class="flag-row">${badges}</div>
+      ${trophy.missable ? `<p class="risk-line"><strong>At risk:</strong> ${esc(RISK_LINE)}${citeHtml(RISK_CITES)}</p>` : ''}
       ${stepsHtml(trophy)}
-      ${tipsHtml(trophy)}
       ${disputesHtml(trophy)}
       ${trophy.unconfirmed ? `<div class="unconfirmed-box"><strong>Still unconfirmed</strong>${esc(trophy.unconfirmed)}</div>` : ''}
+      <p class="in-short"><strong>In short:</strong> ${esc(trophy.guide)}${citeHtml(citedIds(trophy))}</p>
+      ${tipsHtml(trophy)}
       ${counterHtml(trophy)}
-      ${citedSourcesHtml(trophy)}
-      <button type="button" class="earn-btn${earned ? ' earned' : ''}" id="detail-earn">${earned ? '✓ Earned — tap to undo' : 'Mark as earned'}</button>
+      <p class="detail-foot">Our own wording · ${citedIds(trophy).length} sources · ${(trophy.steps || []).length} steps, each cited</p>
     </article>`;
     detailEl.querySelector('#detail-earn').addEventListener('click', () => {
       LeonidaTracker.toggleEarned(trophy.name);
@@ -492,6 +601,59 @@
     wireCites(detailEl);
   }
 
+  /* ---------- right rail: next up + sources for this guide ---------- */
+
+  function renderRail() {
+    const trophy = byId(selectedId) || trophies[0];
+    if (!trophy) {
+      railEl.innerHTML = '';
+      return;
+    }
+    const next = trophies
+      .filter((t) => t.id !== trophy.id && !LeonidaTracker.isEarned(t.name))
+      .sort(
+        (a, b) =>
+          Number(!!b.missable) - Number(!!a.missable) ||
+          GRADE_RANK[a.grade] - GRADE_RANK[b.grade] ||
+          a.id - b.id,
+      )
+      .slice(0, 4);
+    const nextHtml = next
+      .map(
+        (t) => `<button type="button" class="next-item" data-open="${t.id}">
+          <span class="grade-dot ${t.grade}">${GRADE_LETTER[t.grade]}</span>
+          <span><span class="n-name">${esc(displayName(t))}${t.missable ? '<span class="flag risk">At risk</span>' : ''}</span>
+          <span class="n-sub">${KIND_LABELS[t.kind]}${t.chapterLabel ? ` · ${esc(t.chapterLabel)}` : ''} · ${(t.steps || []).length} steps</span></span>
+        </button>`,
+      )
+      .join('');
+    const stats = sourceStats();
+    const mine = citedIds(trophy)
+      .map((n) => ({ n, src: registry.get(n), here: claimsHere(trophy, n) }))
+      .filter((row) => row.src)
+      .sort((a, b) => b.here - a.here || a.n - b.n);
+    const sourcesHtml = mine
+      .map(
+        (row) => `<div class="rail-source">
+          <span class="cite-static">[${row.n}]</span> <span class="rs-name">${esc(row.src.short)}</span>
+          <span class="rs-meta">${row.here} claim${row.here === 1 ? '' : 's'} here · in ${stats.get(row.n).guides.size}/${trophies.length} guides · read ${esc(row.src.read)}</span>
+        </div>`,
+      )
+      .join('');
+    railEl.innerHTML = `<div class="rail-card">
+        <div class="rail-head">Next up</div>
+        ${nextHtml || '<p class="rail-note">Everything else is earned. Nothing left but the applause.</p>'}
+      </div>
+      <div class="rail-card">
+        <div class="rail-head">Sources for this guide</div>
+        ${sourcesHtml}
+        <p class="rail-note">Tap any [n · name] chip in the steps to jump to the full registry entry.</p>
+      </div>`;
+    railEl.querySelectorAll('[data-open]').forEach((btn) => {
+      btn.addEventListener('click', () => selectTrophy(Number(btn.dataset.open)));
+    });
+  }
+
   /* ---------- roadmap ---------- */
 
   function trophyChips(ids) {
@@ -501,7 +663,7 @@
         if (!t) return '';
         const earned = LeonidaTracker.isEarned(t.name);
         const label = isMasked(t) ? 'Hidden story trophy' : t.name;
-        return `<button type="button" class="stage-chip${earned ? ' done' : ''}" data-open="${t.id}"><span class="grade-dot ${t.grade}"></span>${esc(label)}${t.missable ? '<span class="mini-miss">AT RISK</span>' : ''}${earned ? ' ✓' : ''}</button>`;
+        return `<button type="button" class="stage-chip${earned ? ' done' : ''}" data-open="${t.id}"><span class="grade-dot ${t.grade}">${GRADE_LETTER[t.grade]}</span>${esc(label)}${t.missable ? '<span class="mini-miss">AT RISK</span>' : ''}${earned ? ' ✓' : ''}</button>`;
       })
       .join('');
   }
@@ -587,21 +749,27 @@
     const pma = byId(28);
     let html = '';
     if (pma) {
-      html += `<article class="missable-card">
-        <span class="missable-badge">AT RISK — UNCONFIRMED</span>
+      html += `<article class="missable-card tone-danger">
+        <span class="card-badge">AT RISK — UNCONFIRMED</span>
         <h2>${esc(pma.name)}</h2>
         <p class="official-desc">“${esc(pma.description)}” — official description</p>
-        <p class="why"><strong>The one trophy to protect:</strong> ${esc(pma.missableNote)}</p>
+        <div class="arith" aria-label="How the 18 meditations add up">
+          <span class="cell"><b>1</b>house — Ch 1 balcony</span><span class="op">+</span>
+          <span class="cell"><b>8 × 2</b>spots, both characters</span><span class="op">+</span>
+          <span class="cell"><b>1</b>Ascent Mountain final</span><span class="op">=</span>
+          <span class="cell total"><b>18</b>meditations</span>
+        </div>
+        <p><strong>The one trophy to protect:</strong> ${esc(pma.missableNote)}</p>
         <p>${esc(pma.guide)}</p>
         <button type="button" class="open-guide-btn" data-open="${pma.id}">Open the full guide — steps &amp; citations</button>
       </article>`;
     }
     html += PONR_CARDS.map(
       (card) => `<article class="missable-card tone-${card.tone}">
-        <span class="missable-badge tone-${card.tone}">${esc(card.badge)}</span>
+        <span class="card-badge tone-${card.tone}">${esc(card.badge)}</span>
         <h2>${esc(card.title)}</h2>
         ${card.body.map((p) => `<p>${esc(p)}</p>`).join('')}
-        <div class="dispute-cites">${citeHtml(card.cites)}</div>
+        <div>${citeHtml(card.cites)}</div>
       </article>`,
     ).join('');
     missableEl.innerHTML = html;
@@ -615,15 +783,16 @@
     wireCites(missableEl);
   }
 
-  /* ---------- sources registry ---------- */
+  /* ---------- sources registry + citation matrix ---------- */
 
   function renderSources() {
     const entries = [...registry.values()].sort((a, b) => a.n - b.n);
-    sourcesEl.innerHTML =
-      entries
-        .map(
-          (src) => `<article class="source-card" id="source-${src.n}">
-          <div class="source-num">[${src.n}]</div>
+    const stats = sourceStats();
+    let html = entries
+      .map((src) => {
+        const row = stats.get(src.n) || { claims: 0, guides: new Set() };
+        return `<article class="source-row" id="source-${src.n}">
+          <span class="cite-static source-num">[${src.n}]</span>
           <div class="source-body">
             <h2>${esc(src.short)}</h2>
             <p class="source-title">${
@@ -631,22 +800,49 @@
                 ? `<a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.title)}</a>`
                 : esc(src.title)
             }</p>
-            <p class="source-meta">${esc(src.host)} · ${esc(src.kind)} · read ${esc(src.read)}</p>
+            <p class="source-meta">${esc(src.host)} · ${esc(src.kind)} · read ${esc(src.read)} · cited in ${row.guides.size}/${trophies.length} guides</p>
             <p class="source-note">${esc(src.note)}</p>
           </div>
-        </article>`,
-        )
-        .join('') +
-      `<p class="sources-footnote">Anything not in this registry — pages that refused us, pages seen only as search-result snippets — was used, at most, as a lead. It is never cited as evidence in the guides.</p>`;
+          <div class="source-claims"><b>${row.claims}</b><span>claims cited</span></div>
+        </article>`;
+      })
+      .join('');
+    const head = entries.map((src) => `<th title="${esc(src.short)}">[${src.n}]</th>`).join('');
+    const body = trophies
+      .map((t) => {
+        const cells = entries
+          .map((src) => {
+            const count = claimsHere(t, src.n);
+            if (!count) return '<td></td>';
+            const alpha = Math.min(0.16 + 0.2 * (count - 1), 0.82).toFixed(2);
+            return `<td class="hit" style="background: rgba(14, 124, 107, ${alpha})">${count}</td>`;
+          })
+          .join('');
+        return `<tr><td class="m-name">${esc(displayName(t))}</td>${cells}</tr>`;
+      })
+      .join('');
+    const totals = entries
+      .map((src) => `<td>${(stats.get(src.n) || { claims: 0 }).claims}</td>`)
+      .join('');
+    html += `<h3 class="sec-head matrix-head">Trophy × source matrix — every citation, mapped</h3>
+      <div class="matrix-wrap"><table class="matrix">
+        <thead><tr><th class="m-name">Trophy</th>${head}</tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td class="m-name">Claims per source</td>${totals}</tr></tfoot>
+      </table></div>
+      <p class="sources-footnote">Anything not in this registry — pages that refused us, pages seen only as search-result snippets — was used, at most, as a lead. It is never cited as evidence in the guides.</p>`;
+    sourcesEl.innerHTML = html;
   }
 
   /* ---------- view + selection control ---------- */
 
   function renderAll() {
     renderHeader();
+    renderAudit();
     renderChips();
     renderList();
     renderDetail();
+    renderRail();
     renderRoadmap();
     renderMissables();
     renderSources();
@@ -672,6 +868,7 @@
     selectedId = id;
     renderList();
     renderDetail();
+    renderRail();
   }
 
   function wireControls() {
