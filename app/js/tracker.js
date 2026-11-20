@@ -86,7 +86,14 @@
 
   function exportProgress() {
     const payload = JSON.stringify(
-      { app: 'leonida-legend', earned: [...state.earned], counts: state.counts, spoiler: state.spoiler },
+      {
+        app: 'leonida-legend',
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        earned: [...state.earned],
+        counts: state.counts,
+        spoiler: state.spoiler,
+      },
       null,
       2,
     );
@@ -97,12 +104,25 @@
     URL.revokeObjectURL(link.href);
   }
 
+  // Imported counts are untrusted input: keep only finite, non-negative
+  // numbers, keyed by trophy name, so a hand-edited file can never put the
+  // tracker into a state its own buttons could not reach.
+  function sanitizeCounts(raw) {
+    const clean = {};
+    if (raw && typeof raw === 'object') {
+      for (const [name, value] of Object.entries(raw)) {
+        const n = Number(value);
+        if (Number.isFinite(n) && n >= 0) clean[name] = Math.round(n);
+      }
+    }
+    return clean;
+  }
+
   async function importProgress(file) {
     const parsed = JSON.parse(await file.text());
     if (!parsed || !Array.isArray(parsed.earned)) throw new Error('Not a Leonida Legend progress file.');
     state.earned = new Set(parsed.earned.filter((n) => typeof n === 'string'));
-    state.counts =
-      parsed.counts && typeof parsed.counts === 'object' ? parsed.counts : {};
+    state.counts = sanitizeCounts(parsed.counts);
     state.spoiler = !!parsed.spoiler;
     saveState();
   }
