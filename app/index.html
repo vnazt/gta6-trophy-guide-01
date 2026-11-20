@@ -1,25 +1,74 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GTA VI trophy checklist</title>
+<title>Leonida Legend — GTA VI Trophy Guide &amp; Tracker</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1>GTA VI trophy checklist</h1>
-  <p id="progress">0 of 55 earned</p>
+<header class="masthead">
+  <div class="brand">
+    <svg class="palm-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="30" r="17" class="sun"></circle>
+      <g class="fronds">
+        <path d="M32 34 C 30 24, 22 16, 12 15"></path>
+        <path d="M32 34 C 31 22, 26 12, 18 8"></path>
+        <path d="M32 34 C 33 21, 38 12, 46 8"></path>
+        <path d="M32 34 C 34 24, 42 16, 52 15"></path>
+        <path d="M32 34 C 32 24, 32 15, 32 7"></path>
+      </g>
+      <path class="trunk" d="M32 58 C 31 48, 32 41, 32 34"></path>
+    </svg>
+    <div class="brand-text">
+      <h1>Leonida Legend</h1>
+      <p class="tagline">Grand Theft Auto VI — Trophy Guide &amp; Tracker · PlayStation 5 · All 55 official trophies, every guide in our own words and cited</p>
+    </div>
+  </div>
+  <div class="progress-block">
+    <div class="progress-numbers"><span id="earned-count">0</span><span class="of">/ 55 earned</span><span id="percent" class="percent">0%</span></div>
+    <div class="progress-bar"><div id="progress-fill"></div></div>
+    <div id="grade-counts" class="grade-counts"></div>
+  </div>
+  <div class="tools">
+    <label class="search"><span>Search</span><input id="search" type="search" placeholder="Find a trophy, mission, place…"></label>
+    <button id="spoiler-toggle" class="tool-btn" type="button">Spoiler shield: OFF</button>
+    <button id="export-btn" class="tool-btn" type="button">Export progress</button>
+    <label class="tool-btn import-btn">Import progress<input id="import-file" type="file" accept="application/json" hidden></label>
+  </div>
 </header>
-<div class="controls">
-  <label>Grade <select id="grade"><option value="all">All</option><option value="platinum">Platinum</option><option value="gold">Gold</option><option value="silver">Silver</option><option value="bronze">Bronze</option></select></label>
-  <button id="export" type="button">Export progress</button>
-  <label class="import">Import progress <input id="import" type="file" accept="application/json"></label>
-</div>
-<table>
-  <thead><tr><th>Earned</th><th>Trophy</th><th>Grade</th><th>How to get it</th></tr></thead>
-  <tbody id="rows"></tbody>
-</table>
-<script type="module" src="app.js"></script>
+
+<nav class="views" aria-label="Guide views">
+  <button class="view-tab active" data-view="guide" type="button">Guide &amp; Tracker</button>
+  <button class="view-tab" data-view="roadmap" type="button">Roadmap to the Platinum</button>
+  <button class="view-tab" data-view="missables" type="button">Missable Watch-Outs</button>
+</nav>
+
+<main>
+  <section id="view-guide">
+    <div class="chips" id="filter-chips" role="group" aria-label="Filter trophies"></div>
+    <div class="layout">
+      <div id="trophy-list" class="trophy-list"></div>
+      <aside id="detail" class="detail" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <section id="view-roadmap" hidden>
+    <p class="view-intro">The road to <strong>Vice Got a Price!</strong>, built from the official trophy descriptions: play the story in order, respect the four missable windows, grind the counts region by region, then clean up. Progress for every stage is tracked live.</p>
+    <div id="roadmap" class="roadmap"></div>
+  </section>
+
+  <section id="view-missables" hidden>
+    <p class="view-intro">Four trophies whose <strong>own official descriptions</strong> tie them to one-time moments — a scripted airport visit, an opening-hours cocktail, a showroom set-piece, a unique hunt. Each card quotes the reasoning, straight from the description, so you can judge for yourself.</p>
+    <div id="missable-list" class="missable-list"></div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <p>Guides written for this page in our own words. Trophy names, descriptions and grades are the official PlayStation list, as published by <a href="https://www.exophase.com/game/grand-theft-auto-vi-psn/trophies/" target="_blank" rel="noopener">Exophase</a> and <a href="https://psnprofiles.com/trophies/" target="_blank" rel="noopener">PSNProfiles</a> — every trophy's detail panel cites its sources. Progress is stored only in your browser (localStorage); export it before switching devices. This app loads nothing from the network beyond its own files.</p>
+</footer>
+
+<script src="js/tracker.js"></script>
+<script src="js/guide-view.js"></script>
 </body>
 </html>
